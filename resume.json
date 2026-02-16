@@ -1,0 +1,34 @@
+{
+    "contacts": {
+        "f_name": "harsh",
+        "m_name": "",
+        "l_name": "",
+        "email": "",
+        "linked_in": "",
+        "github": "",
+        "phone": ""
+    },
+    "education": {
+        "degree": "",
+        "institute": "",
+        "year": "",
+        "Percent_CGPA": ""
+    },
+    "experience": {
+        "company": "",
+        "role": "",
+        "years": ""
+    },
+    "projects": {
+        "P_name": "",
+        "P_description": "",
+        "members": "",
+        "url": ""
+    },
+    "Relevant CourseWork": [
+        ""
+    ],
+    "skills": [
+        ""
+    ]
+}
