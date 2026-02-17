@@ -4,6 +4,7 @@ import json
 import os
 from llm import enhance_resume, load_docx_template
 from json_preview import build_live_payload
+from doc_gen import generate_docx
 
 
 
@@ -24,6 +25,13 @@ if 'resume' not in st.session_state:
         "skills": [],
         "coursework": []
     }
+
+if "generated_resume" not in st.session_state:
+    st.session_state.generated_resume = None
+
+if "has_generated" not in st.session_state:
+    st.session_state.has_generated = False
+
 
 # --- VALIDATION ---
 def get_missing_fields(contacts, edu_list, exp_list, proj_list):
@@ -79,9 +87,11 @@ with col_logo:
 
 with col_actions:
     st.write("##")
-    act1, act2 = st.columns(2)
+    act1, act2, act3 = st.columns(3)
     show_history = act1.button("📜 History", use_container_width=True)
     save_trigger = act2.button("💾 Save", type="primary", use_container_width=True)
+    reset_trigger = act3.button("🆕 New", use_container_width=True)
+
 
 st.divider()
 
@@ -104,9 +114,34 @@ if show_history:
             if st.button("📥 Import Selected Resume"):
                 with open(os.path.join(DB_DIR, selected_file), 'r') as f:
                     data = json.load(f)
-                    st.session_state.resume = data
-                    st.success(f"Successfully loaded {selected_file}!")
-                    st.rerun()
+
+                # 🔥 FULL RESET (safe version)
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+
+                # 🔹 Reinitialize base structure
+                st.session_state.resume = {
+                    "education": data.get("education", []),
+                    "experience": data.get("experience", []),
+                    "projects": data.get("projects", []),
+                    "skills": data.get("skills", []),
+                    "coursework": data.get("coursework", [])
+                }
+
+                # 🔹 Restore contacts
+                contacts = data.get("contacts", {})
+                st.session_state["f_name"] = contacts.get("f_name", "")
+                st.session_state["m_name"] = contacts.get("m_name", "")
+                st.session_state["l_name"] = contacts.get("l_name", "")
+                st.session_state["email"] = contacts.get("email", "")
+                st.session_state["phone"] = contacts.get("phone", "")
+                st.session_state["linked_in"] = contacts.get("linked_in", "")
+                st.session_state["github"] = contacts.get("github", "")
+
+                st.rerun()
+
+
+
 
 # --- SAVE LOGIC ---
 if save_trigger:
@@ -166,6 +201,29 @@ if save_trigger:
         json.dump(save_payload, f, indent=4)
 
     st.success(f"✅ Resume saved successfully as {filename}")
+
+# --- RESET LOGIC ---
+if reset_trigger:
+    # Clear all session state
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    # Reinitialize resume structure
+    st.session_state.resume = {
+        "education": [],
+        "experience": [],
+        "projects": [],
+        "skills": [],
+        "coursework": []
+    }
+
+    st.success("✨ Form Reset Successfully!")
+    st.rerun()
+
+
+
+
+
 
 
 # --- CONTACT ---
@@ -331,7 +389,7 @@ with st.container(border=True):
             st.error(f"🚫 Missing: {', '.join(missing)}")
         else:
             template_text = load_docx_template()
-
+            
             final_payload = {
                 "contacts": contacts,
                 "education": education,
@@ -339,17 +397,91 @@ with st.container(border=True):
                 "projects": projects,
                 "skills": st.session_state.resume["skills"],
                 "coursework": st.session_state.resume["coursework"]
-            }
+                }
+            st.session_state.last_payload = final_payload
+
             
-            generated_resume = enhance_resume(final_payload, template_text)
+            # ✅ NEW: Separate JD payload
+            jd_payload = {
+                "job_title": st.session_state.get("jd_title", ""),
+                "description": st.session_state.get("jd_desc", ""),
+                "skills_required": st.session_state.get("jd_skills", "")
+                }
+            
+            # ✅ UPDATED: Pass JD separately
+            generated_resume = enhance_resume(
+                resume_json=final_payload,
+                job_description_json=jd_payload,
+                Sample_Template=template_text
+                )
+            
+            st.session_state.generated_resume = generated_resume
+            st.session_state.has_generated = True
+
 
             st.success("✅ Resume Generated Successfully!")
             st.text_area("Final Output", generated_resume, height=600)
+            
+            # ✅ Generate DOCX file
+            docx_file = generate_docx(generated_resume, "Generated_Resume.docx")
+            
+            # ✅ Provide DOCX download
+            with open(docx_file, "rb") as f:
+                st.download_button(
+                    label="⬇️ Download Resume.docx",
+                    data=f,
+                    file_name="Generated_Resume.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                    )
 
-            st.download_button(
-                label="⬇️ Download Resume.txt",
-                data=generated_resume,
-                file_name="Generated_Resume.txt",
-                mime="text/plain",
-                use_container_width=True
+
+
+
+
+# --- FEEDBACK SECTION ---
+if st.session_state.has_generated and "last_payload" in st.session_state:
+
+    with st.container(border=True):
+        st.subheader("🔁 Improve Resume with Feedback")
+
+        feedback_text = st.text_area(
+            "Provide feedback to improve the resume",
+            key="resume_feedback",
+            height=120
+        )
+
+        if st.button("🚀 Regenerate with Feedback", use_container_width=True):
+
+            template_text = load_docx_template()
+
+            jd_payload = {
+                "job_title": st.session_state.get("jd_title", ""),
+                "description": st.session_state.get("jd_desc", ""),
+                "skills_required": st.session_state.get("jd_skills", "")
+            }
+
+            improved_resume = enhance_resume(
+                resume_json=st.session_state.last_payload,
+                job_description_json=jd_payload,
+                Sample_Template=template_text,
+                feedback=feedback_text
             )
+
+            st.session_state.generated_resume = improved_resume
+
+            st.success("✅ Resume Improved Successfully!")
+
+            st.text_area("Updated Resume", improved_resume, height=600)
+
+            # 👇 NEW DOWNLOAD
+            docx_file = generate_docx(improved_resume, "Improved_Resume.docx")
+
+            with open(docx_file, "rb") as file:
+                st.download_button(
+                    label="📥 Download Improved Resume (.docx)",
+                    data=file,
+                    file_name="Improved_Resume.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
