@@ -28,10 +28,17 @@ def load_docx_template(template_name="sample_template.docx"):  # ✅ FIXED CASE
 
 def clean_json(data):
     if isinstance(data, dict):
-        return {k: clean_json(v) for k, v in data.items() if v not in ["", [], [""]]}
+        cleaned = {}
+        for k, v in data.items():
+            v = clean_json(v)
+            if v not in ["", None, [], {}]:
+                cleaned[k] = v
+        return cleaned
     elif isinstance(data, list):
-        return [clean_json(v) for v in data if v not in ["", None]]
+        cleaned_list = [clean_json(v) for v in data]
+        return [v for v in cleaned_list if v not in ["", None, {}, []]]
     return data
+
 
 def enhance_resume(resume_json, sample_resume_latex):
     cleaned_data = clean_json(resume_json)
@@ -81,7 +88,7 @@ You MUST strictly follow this exact section order and formatting:
    CATEGORY: skills comma separated
 
 CRITICAL RULES:
-
+Generate bullets points and all for projects,exp and all from the descrpition and inputs given.
 SECTION ORDER:
 Preserve section order exactly as defined above.
 If a section has no meaningful content, omit the entire section.

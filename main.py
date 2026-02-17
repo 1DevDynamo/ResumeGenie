@@ -3,6 +3,9 @@ from datetime import datetime
 import json
 import os
 from llm import enhance_resume, load_docx_template
+from json_preview import build_live_payload
+
+
 
 # --- DIRECTORY SETUP ---
 DB_DIR = "dB"
@@ -82,6 +85,14 @@ with col_actions:
 
 st.divider()
 
+#Side Bar
+st.sidebar.title("About")
+# --- LIVE SIDEBAR JSON PREVIEW ---
+st.sidebar.subheader("📦 Live JSON Payload")
+live_payload = build_live_payload()
+st.sidebar.json(live_payload)
+
+
 # --- HISTORY ---
 if show_history:
     with st.expander("📚 Saved Resumes (History)", expanded=True):
@@ -96,6 +107,66 @@ if show_history:
                     st.session_state.resume = data
                     st.success(f"Successfully loaded {selected_file}!")
                     st.rerun()
+
+# --- SAVE LOGIC ---
+if save_trigger:
+
+    contacts = {
+        "f_name": st.session_state.get("f_name", ""),
+        "m_name": st.session_state.get("m_name", ""),
+        "l_name": st.session_state.get("l_name", ""),
+        "email": st.session_state.get("email", ""),
+        "phone": st.session_state.get("phone", ""),
+        "linked_in": st.session_state.get("linked_in", ""),
+        "github": st.session_state.get("github", "")
+    }
+
+    education = []
+    for i in range(len(st.session_state.resume["education"])):
+        education.append({
+            "degree": st.session_state.get(f"deg_{i}", ""),
+            "institute": st.session_state.get(f"inst_{i}", ""),
+            "start": str(st.session_state.get(f"s_ed_{i}", "")),
+            "end": str(st.session_state.get(f"e_ed_{i}", ""))
+        })
+
+    experience = []
+    for i in range(len(st.session_state.resume["experience"])):
+        experience.append({
+            "company": st.session_state.get(f"comp_{i}", ""),
+            "role": st.session_state.get(f"role_{i}", ""),
+            "start": str(st.session_state.get(f"s_ex_{i}", "")),
+            "end": str(st.session_state.get(f"e_ex_{i}", "")),
+            "desc": st.session_state.get(f"desc_{i}", "")
+        })
+
+    projects = []
+    for i in range(len(st.session_state.resume["projects"])):
+        projects.append({
+            "name": st.session_state.get(f"pj_name_{i}", ""),
+            "url": st.session_state.get(f"pj_url_{i}", ""),
+            "mem": st.session_state.get(f"pj_mem_{i}", ""),
+            "desc": st.session_state.get(f"pj_desc_{i}", "")
+        })
+
+    save_payload = {
+        "contacts": contacts,
+        "education": education,
+        "experience": experience,
+        "projects": projects,
+        "skills": st.session_state.resume["skills"],
+        "coursework": st.session_state.resume["coursework"]
+    }
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{contacts.get('f_name','User')}_{timestamp}.json"
+    filepath = os.path.join(DB_DIR, filename)
+
+    with open(filepath, "w") as f:
+        json.dump(save_payload, f, indent=4)
+
+    st.success(f"✅ Resume saved successfully as {filename}")
+
 
 # --- CONTACT ---
 with st.container(border=True):
@@ -176,6 +247,17 @@ with st.container(border=True):
                 st.session_state.resume["projects"].pop(i)
                 st.rerun()
 
+# --- Job Description ---
+st.write("##")
+with st.container(border=True):
+    st.subheader("📄 Job Description")
+
+    st.text_input("💼 Job Title", key="jd_title")
+    st.text_area("📝 Job Description", key="jd_desc", height=150)
+    st.text_area("🛠️ Skills Required (comma separated)", key="jd_skills", height=100)
+
+
+
 # --- SKILLS & COURSEWORK ---
 st.write("##")
 g1, g2 = st.columns(2)
@@ -241,6 +323,8 @@ with st.container(border=True):
                 "desc": st.session_state.get(f"pj_desc_{i}", "")
             })
 
+        
+
         missing = get_missing_fields(contacts, education, experience, projects)
 
         if missing:
@@ -256,7 +340,7 @@ with st.container(border=True):
                 "skills": st.session_state.resume["skills"],
                 "coursework": st.session_state.resume["coursework"]
             }
-
+            
             generated_resume = enhance_resume(final_payload, template_text)
 
             st.success("✅ Resume Generated Successfully!")

@@ -1,0 +1,42 @@
+{
+    "contacts": {
+        "f_name": "VishwaS",
+        "m_name": "",
+        "l_name": "Hello",
+        "email": "harsh@gmail.com",
+        "phone": "+91 982547058",
+        "linked_in": "linkedin.com",
+        "github": "github.com"
+    },
+    "education": [
+        {
+            "degree": "Bachelor's",
+            "institute": "medicaps",
+            "start": "2026-02-17",
+            "end": "2026-02-17"
+        }
+    ],
+    "experience": [
+        {
+            "company": "Avery Bit",
+            "role": "Intern",
+            "start": "2026-02-17",
+            "end": "2026-02-17",
+            "desc": "Ai ml intern"
+        }
+    ],
+    "projects": [
+        {
+            "name": "Number Predication",
+            "url": "",
+            "mem": "3",
+            "desc": "built number predictore using cnn and nlp"
+        }
+    ],
+    "skills": [
+        "python , sql"
+    ],
+    "coursework": [
+        "DeepLearning"
+    ]
+}
