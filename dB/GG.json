@@ -1,0 +1,42 @@
+{
+    "education": [
+        {
+            "degree": "Bachelor's",
+            "institute": "medicaos",
+            "start": "2026-02-17",
+            "end": "2026-02-17"
+        }
+    ],
+    "experience": [
+        {
+            "company": "averybit",
+            "role": "intern",
+            "start": "2026-02-17",
+            "end": "2026-02-17",
+            "desc": "working with ai and rag and all"
+        }
+    ],
+    "projects": [
+        {
+            "name": "Number Predication",
+            "url": "",
+            "mem": "3",
+            "desc": "used and applied cnn and nlp "
+        }
+    ],
+    "skills": [
+        "python , sql"
+    ],
+    "coursework": [
+        "DeepLearning"
+    ],
+    "contacts": {
+        "f_name": "Vishwas",
+        "m_name": "",
+        "l_name": "Bhargav",
+        "email": "harsh@gmail.com",
+        "phone": "+91 982547058",
+        "linked_in": "linkedin.com",
+        "github": "github.com"
+    }
+}

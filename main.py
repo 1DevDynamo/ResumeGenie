@@ -1,7 +1,15 @@
 import streamlit as st
 from datetime import datetime
+import json
+import os
+from llm import enhance_resume, load_docx_template
 
-# --- APP SETUP ---
+# --- DIRECTORY SETUP ---
+DB_DIR = "dB"
+if not os.path.exists(DB_DIR):
+    os.makedirs(DB_DIR)
+
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Resume Genie 🧞", layout="centered")
 
 # --- INITIAL STATE ---
@@ -14,148 +22,250 @@ if 'resume' not in st.session_state:
         "coursework": []
     }
 
-# --- VALIDATION & SAVE FUNCTION ---
-def handle_save(contacts, edu_list, exp_list, proj_list):
-    # 1. Check Mandatory Contact Fields
-    contact_reqs = {
-        "First Name": contacts['f_name'],
-        "Last Name": contacts['l_name'],
-        "Email": contacts['email'],
-        "Phone": contacts['phone']
-    }
-    
-    missing = [label for label, value in contact_reqs.items() if not value or value.strip() == ""]
-    
-    # 2. Check Dynamic Sections (Mandatory if a row exists)
-    for i, edu in enumerate(edu_list):
-        if not edu.get('institute'): missing.append(f"Education #{i+1} Institute")
-    
-    for i, exp in enumerate(exp_list):
-        if not exp.get('company'): missing.append(f"Experience #{i+1} Company")
-        
-    for i, proj in enumerate(proj_list):
-        if not proj.get('name'): missing.append(f"Project #{i+1} Name")
-    
-    if missing:
-        st.error(f"🚫 Cannot save! Missing: {', '.join(missing)}")
-    else:
-        st.success("💾 Resume saved successfully! Your story is ready. ✨")
+# --- VALIDATION ---
+def get_missing_fields(contacts, edu_list, exp_list, proj_list):
+    missing = []
 
-# --- HEADER SECTION ---
+    def is_empty(val):
+        return val is None or str(val).strip() == ""
+
+    # --- CONTACT ---
+    if is_empty(contacts.get('f_name')):
+        missing.append("First Name")
+    if is_empty(contacts.get('l_name')):
+        missing.append("Last Name")
+    if is_empty(contacts.get('email')):
+        missing.append("Email")
+    if is_empty(contacts.get('phone')):
+        missing.append("Phone")
+
+    # --- EDUCATION ---
+    for i, edu in enumerate(edu_list):
+        # Only validate if user started typing institute
+        if is_empty(edu.get('institute')):
+            continue
+
+        # If institute exists, it's valid (required field satisfied)
+        # No further action needed
+
+    # --- EXPERIENCE ---
+    for i, exp in enumerate(exp_list):
+        if is_empty(exp.get('company')) and any([
+            not is_empty(exp.get('role')),
+            not is_empty(exp.get('desc'))
+        ]):
+            missing.append(f"Experience #{i+1} Company")
+
+    # --- PROJECTS ---
+    for i, proj in enumerate(proj_list):
+        if is_empty(proj.get('name')) and any([
+            not is_empty(proj.get('url')),
+            not is_empty(proj.get('mem')),
+            not is_empty(proj.get('desc'))
+        ]):
+            missing.append(f"Project #{i+1} Name")
+
+    return missing
+
+
+# --- HEADER ---
 col_logo, col_actions = st.columns([3, 2])
 with col_logo:
-    st.title("Resume Genie 🧞")
+    st.title("Resume Genie 🧞✨")
     st.caption("Transforming your career path into a professional story 📖")
 
 with col_actions:
-    st.write("##") 
+    st.write("##")
     act1, act2 = st.columns(2)
-    act1.button("📜 History", use_container_width=True)
+    show_history = act1.button("📜 History", use_container_width=True)
     save_trigger = act2.button("💾 Save", type="primary", use_container_width=True)
 
 st.divider()
 
-# --- CONTACT INFORMATION ---
+# --- HISTORY ---
+if show_history:
+    with st.expander("📚 Saved Resumes (History)", expanded=True):
+        files = [f for f in os.listdir(DB_DIR) if f.endswith('.json')]
+        if not files:
+            st.info("No saved resumes found in dB folder.")
+        else:
+            selected_file = st.selectbox("Select a resume to load:", files)
+            if st.button("📥 Import Selected Resume"):
+                with open(os.path.join(DB_DIR, selected_file), 'r') as f:
+                    data = json.load(f)
+                    st.session_state.resume = data
+                    st.success(f"Successfully loaded {selected_file}!")
+                    st.rerun()
+
+# --- CONTACT ---
 with st.container(border=True):
     st.subheader("👤 Contact Information")
     c1, c2 = st.columns(2)
-    contact_data = {
-        'f_name': c1.text_input("First Name *", placeholder="👤 John"),
-        'm_name': c2.text_input("Middle Name", placeholder="💎 Optional"),
-        'l_name': c1.text_input("Last Name *", placeholder="Doe"),
-        'email': c2.text_input("Email *", placeholder="📧 john@example.com"),
-        'phone': c1.text_input("Phone *", placeholder="📞 +1 (555) 000-0000"),
-        'linked_in': c2.text_input("LinkedIn", placeholder="🔗 https://linkedin.com/in/..."),
-        'github': st.text_input("GitHub", placeholder="🐙 https://github.com/...")
-    }
 
-# --- DYNAMIC SECTIONS ---
+    c1.text_input("First Name *", key="f_name")
+    c2.text_input("Middle Name", key="m_name")
+    c1.text_input("Last Name *", key="l_name")
+    c2.text_input("Email *", key="email")
+    c1.text_input("Phone *", key="phone")
+    c2.text_input("LinkedIn", key="linked_in")
+    st.text_input("GitHub", key="github")
 
-# EDUCATION
+# --- EDUCATION ---
 st.write("##")
 with st.container(border=True):
     ed_h1, ed_h2 = st.columns([4, 1.2])
     ed_h1.subheader("🎓 Education")
-    if ed_h2.button("➕ Add", key="add_edu"):
-        st.session_state.resume["education"].append({"degree": "Bachelor's", "institute": ""})
 
-    for i, edu in enumerate(st.session_state.resume["education"]):
+    if ed_h2.button("➕ Add Edu", key="add_edu"):
+        st.session_state.resume["education"].append({})
+
+    for i in range(len(st.session_state.resume["education"])):
         with st.container(border=True):
             e_col1, e_col2 = st.columns(2)
-            edu['degree'] = e_col1.selectbox("📜 Degree", ["Bachelor's", "Master's", "PhD", "Certification"], key=f"deg_{i}")
-            edu['institute'] = e_col2.text_input("🏫 Institute *", key=f"inst_{i}", placeholder="University Name")
+            e_col1.selectbox("📜 Degree", ["Bachelor's", "Master's", "PhD"], key=f"deg_{i}")
+            e_col2.text_input("🏫 Institute *", key=f"inst_{i}")
             d_col1, d_col2 = st.columns(2)
-            edu['start'] = d_col1.date_input("📅 Start Date", key=f"s_ed_{i}")
-            edu['end'] = d_col2.date_input("🏁 End Date", key=f"e_ed_{i}")
-            if st.button(f"🗑️ Remove", key=f"rem_ed_{i}"):
+            d_col1.date_input("📅 Start Date", key=f"s_ed_{i}")
+            d_col2.date_input("🏁 End Date", key=f"e_ed_{i}")
+
+            if st.button(f"🗑️ Remove Item {i+1}", key=f"rem_ed_{i}"):
                 st.session_state.resume["education"].pop(i)
                 st.rerun()
 
-# EXPERIENCE (UPDATED WITH DATES)
+# --- EXPERIENCE ---
 st.write("##")
 with st.container(border=True):
     ex_h1, ex_h2 = st.columns([4, 1.2])
     ex_h1.subheader("💼 Experience")
-    if ex_h2.button("➕ Add", key="add_exp"):
-        st.session_state.resume["experience"].append({"company": "", "role": ""})
 
-    for i, exp in enumerate(st.session_state.resume["experience"]):
+    if ex_h2.button("➕ Add Exp", key="add_exp"):
+        st.session_state.resume["experience"].append({})
+
+    for i in range(len(st.session_state.resume["experience"])):
         with st.container(border=True):
             c_col1, c_col2 = st.columns(2)
-            exp['company'] = c_col1.text_input("🏢 Company *", key=f"comp_{i}", placeholder="Tech Corp")
-            exp['role'] = c_col2.text_input("🛠️ Role", key=f"role_{i}", placeholder="Software Engineer")
-            
-            # New Date Fields for Experience
-            date_col1, date_col2 = st.columns(2)
-            exp['start'] = date_col1.date_input("📅 Start Date", key=f"s_ex_{i}")
-            exp['end'] = date_col2.date_input("🏁 End Date", key=f"e_ex_{i}")
-            
-            exp['desc'] = st.text_area("📝 Description", key=f"desc_{i}", placeholder="Describe your achievements...")
-            if st.button(f"🗑️ Remove Job", key=f"rem_exp_{i}"):
+            c_col1.text_input("🏢 Company *", key=f"comp_{i}")
+            c_col2.text_input("🛠️ Role", key=f"role_{i}")
+            d_col1, d_col2 = st.columns(2)
+            d_col1.date_input("📅 Start Date", key=f"s_ex_{i}")
+            d_col2.date_input("🏁 End Date", key=f"e_ex_{i}")
+            st.text_area("📝 Description", key=f"desc_{i}")
+
+            if st.button(f"🗑️ Remove Job {i+1}", key=f"rem_exp_{i}"):
                 st.session_state.resume["experience"].pop(i)
                 st.rerun()
 
-# PROJECTS
+# --- PROJECTS ---
 st.write("##")
 with st.container(border=True):
     pj_h1, pj_h2 = st.columns([4, 1.2])
     pj_h1.subheader("🚀 Projects")
-    if pj_h2.button("➕ Add", key="add_pj"):
-        st.session_state.resume["projects"].append({"name": ""})
 
-    for i, project in enumerate(st.session_state.resume["projects"]):
+    if pj_h2.button("➕ Add Project", key="add_pj"):
+        st.session_state.resume["projects"].append({})
+
+    for i in range(len(st.session_state.resume["projects"])):
         with st.container(border=True):
             p_col1, p_col2 = st.columns(2)
-            project['name'] = p_col1.text_input("📛 Project Name *", key=f"pj_name_{i}", placeholder="E-commerce App")
-            project['url'] = p_col2.text_input("🔗 Project URL", key=f"pj_url_{i}", placeholder="https://github.com/...")
-            project['mem'] = st.text_input("👥 Members", key=f"pj_mem_{i}", placeholder="Solo/Team")
-            project['desc'] = st.text_area("📄 Description", key=f"pj_desc_{i}")
-            if st.button(f"🗑️ Remove", key=f"rem_pj_{i}"):
+            p_col1.text_input("📛 Project Name *", key=f"pj_name_{i}")
+            p_col2.text_input("🔗 Project URL", key=f"pj_url_{i}")
+            st.text_input("👥 Members", key=f"pj_mem_{i}")
+            st.text_area("📄 Description", key=f"pj_desc_{i}")
+
+            if st.button(f"🗑️ Remove Project {i+1}", key=f"rem_pj_{i}"):
                 st.session_state.resume["projects"].pop(i)
                 st.rerun()
 
-# SKILLS & COURSEWORK
+# --- SKILLS & COURSEWORK ---
 st.write("##")
-grid_col1, grid_col2 = st.columns(2)
-with grid_col1:
+g1, g2 = st.columns(2)
+
+with g1:
     with st.container(border=True):
         st.subheader("⚡ Skills")
-        if st.button("➕ Add Skill"): st.session_state.resume["skills"].append("")
+        if st.button("➕ Add Skill"):
+            st.session_state.resume["skills"].append("")
         for i in range(len(st.session_state.resume["skills"])):
             st.session_state.resume["skills"][i] = st.text_input(f"S{i}", key=f"sk_{i}", label_visibility="collapsed")
 
-with grid_col2:
+with g2:
     with st.container(border=True):
         st.subheader("📚 Coursework")
-        if st.button("➕ Add Course"): st.session_state.resume["coursework"].append("")
+        if st.button("➕ Add Course"):
+            st.session_state.resume["coursework"].append("")
         for i in range(len(st.session_state.resume["coursework"])):
             st.session_state.resume["coursework"][i] = st.text_input(f"C{i}", key=f"co_{i}", label_visibility="collapsed")
 
-# --- TRIGGER VALIDATION ---
-if save_trigger:
-    handle_save(
-        contact_data, 
-        st.session_state.resume["education"], 
-        st.session_state.resume["experience"], 
-        st.session_state.resume["projects"]
-    )
+# --- GENERATE ---
+st.write("##")
+with st.container(border=True):
+    st.subheader("🧞 Generate Resume")
+
+    if st.button("✨ Generate ATS Resume", use_container_width=True):
+
+        contacts = {
+            "f_name": st.session_state.get("f_name", ""),
+            "m_name": st.session_state.get("m_name", ""),
+            "l_name": st.session_state.get("l_name", ""),
+            "email": st.session_state.get("email", ""),
+            "phone": st.session_state.get("phone", ""),
+            "linked_in": st.session_state.get("linked_in", ""),
+            "github": st.session_state.get("github", "")
+        }
+
+        education = []
+        for i in range(len(st.session_state.resume["education"])):
+            education.append({
+                "degree": st.session_state.get(f"deg_{i}", ""),
+                "institute": st.session_state.get(f"inst_{i}", ""),
+                "start": str(st.session_state.get(f"s_ed_{i}", "")),
+                "end": str(st.session_state.get(f"e_ed_{i}", ""))
+            })
+
+        experience = []
+        for i in range(len(st.session_state.resume["experience"])):
+            experience.append({
+                "company": st.session_state.get(f"comp_{i}", ""),
+                "role": st.session_state.get(f"role_{i}", ""),
+                "start": str(st.session_state.get(f"s_ex_{i}", "")),
+                "end": str(st.session_state.get(f"e_ex_{i}", "")),
+                "desc": st.session_state.get(f"desc_{i}", "")
+            })
+
+        projects = []
+        for i in range(len(st.session_state.resume["projects"])):
+            projects.append({
+                "name": st.session_state.get(f"pj_name_{i}", ""),
+                "url": st.session_state.get(f"pj_url_{i}", ""),
+                "mem": st.session_state.get(f"pj_mem_{i}", ""),
+                "desc": st.session_state.get(f"pj_desc_{i}", "")
+            })
+
+        missing = get_missing_fields(contacts, education, experience, projects)
+
+        if missing:
+            st.error(f"🚫 Missing: {', '.join(missing)}")
+        else:
+            template_text = load_docx_template()
+
+            final_payload = {
+                "contacts": contacts,
+                "education": education,
+                "experience": experience,
+                "projects": projects,
+                "skills": st.session_state.resume["skills"],
+                "coursework": st.session_state.resume["coursework"]
+            }
+
+            generated_resume = enhance_resume(final_payload, template_text)
+
+            st.success("✅ Resume Generated Successfully!")
+            st.text_area("Final Output", generated_resume, height=600)
+
+            st.download_button(
+                label="⬇️ Download Resume.txt",
+                data=generated_resume,
+                file_name="Generated_Resume.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
