@@ -58,7 +58,7 @@ Generate a recruiter ready, ATS optimized, high impact technical resume
 tailored specifically to the provided Job Description.
 
 STRICT OUTPUT RULES:
-- Output plain professional text only
+- Output a JSON object only
 - Do NOT output LaTeX
 - Do NOT output markdown
 - Do NOT include explanations
@@ -75,38 +75,41 @@ STRUCTURE REQUIREMENTS:
 You MUST strictly follow this exact section order and formatting:
 
 1. Header
-   NAME
-   PHONE | EMAIL | LINKEDIN_URL | GITHUB_URL
-____________
+                                                  NAME
+                                PHONE | EMAIL | LINKEDIN_URL | GITHUB_URL
+_________________________________________________________________________________________________________
+
+1. {{Profession Ats freindly Job Description Based Summary}}
+
+_________________________________________________________________________________________________________
 
 2. Education
-   DEGREE  DURATION
-   INSTITUTION  GRADE
-____________
+   DEGREE                                                                 DURATION(yy/mm/dd - yy/mm/dd)
+   INSTITUTION                                                                         GRADE
+_________________________________________________________________________________________________________
 
 3. Experience
-   ROLE — COMPANY  DURATION
+   ROLE — COMPANY                                                         DURATION(yy/mm/dd - yy/mm/dd)
    • Bullet
    • Bullet
    • Bullet
-____________
+_________________________________________________________________________________________________________ 
 
 4. Projects
    PROJECT TITLE
    • Bullet
    • Bullet
-____________
-
+_________________________________________________________________________________________________________
 5. Relevant Coursework
    Bullet list in two rows separated by spaces
-____________
+_________________________________________________________________________________________________________
 
 6. Technical Skills
    CATEGORY: skills comma separated
-____________
+
 
 BULLET RULES (CRITICAL):
-- Maximum 3 bullets per experience
+- Atleast 2 bullets per experience
 - Maximum 2 bullets per project
 - Each bullet ≤ 12 words
 - Force metric driven impact where possible
@@ -129,13 +132,33 @@ SMART CONTENT LOGIC:
 - Do NOT fabricate employment experience
 - Do NOT invent certifications or degrees
 
+Experience Generation Rules:
+- should align with job description have 2 bullet point least
+- Maximum 3 bullets in accordance to job description if not exp not given
+- Do not add experience if not given
+
 PROJECT GENERATION RULES:
 - Only trigger if resume lacks sufficient projects
+- There should be atleast 3 projects according to the Job Description.
 - Must appear authentic and technically credible
 - Must align with candidate skill profile
 - Must follow bullet rules strictly
 
+Summary Rules:
+- Should Align with Project and Job description
+- Should be humanized
+- ATS freindly
+- No irrelevnant info
+- Atleast 3 lines and max 5 lines
+
+Skills and Courswork GENERATION RULES:
+- Should have 5 bullet skills
+- should have 5 bullet coursworks
+- relevant to project and job description
+
 FORMATTING RULES:
+- Same as sample_template 
+- Date and Grade should be at right most of the row
 - Clean spacing between sections
 - Strict alignment
 - No placeholders
