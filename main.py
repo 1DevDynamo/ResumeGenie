@@ -2,10 +2,9 @@ import streamlit as st
 from datetime import datetime
 import json
 import os
-from llm import enhance_resume, load_docx_template
 from json_preview import build_live_payload
-from doc_gen import generate_docx
-
+from llm import enhance_resume
+from doc_gen import generate_docx_from_template
 
 
 # --- DIRECTORY SETUP ---
@@ -388,7 +387,6 @@ with st.container(border=True):
         if missing:
             st.error(f"🚫 Missing: {', '.join(missing)}")
         else:
-            template_text = load_docx_template()
             
             final_payload = {
                 "contacts": contacts,
@@ -411,8 +409,7 @@ with st.container(border=True):
             # ✅ UPDATED: Pass JD separately
             generated_resume = enhance_resume(
                 resume_json=final_payload,
-                job_description_json=jd_payload,
-                Sample_Template=template_text
+                job_description_json=jd_payload
                 )
             
             st.session_state.generated_resume = generated_resume
@@ -420,10 +417,12 @@ with st.container(border=True):
 
 
             st.success("✅ Resume Generated Successfully!")
-            st.text_area("Final Output", generated_resume, height=600)
+            st.json(generated_resume)
+
             
             # ✅ Generate DOCX file
-            docx_file = generate_docx(generated_resume, "Generated_Resume.docx")
+            docx_file = generate_docx_from_template(generated_resume)
+
             
             # ✅ Provide DOCX download
             with open(docx_file, "rb") as f:
@@ -453,7 +452,6 @@ if st.session_state.has_generated and "last_payload" in st.session_state:
 
         if st.button("🚀 Regenerate with Feedback", use_container_width=True):
 
-            template_text = load_docx_template()
 
             jd_payload = {
                 "job_title": st.session_state.get("jd_title", ""),
@@ -464,7 +462,6 @@ if st.session_state.has_generated and "last_payload" in st.session_state:
             improved_resume = enhance_resume(
                 resume_json=st.session_state.last_payload,
                 job_description_json=jd_payload,
-                Sample_Template=template_text,
                 feedback=feedback_text
             )
 
@@ -475,7 +472,7 @@ if st.session_state.has_generated and "last_payload" in st.session_state:
             st.text_area("Updated Resume", improved_resume, height=600)
 
             # 👇 NEW DOWNLOAD
-            docx_file = generate_docx(improved_resume, "Improved_Resume.docx")
+            docx_file = generate_docx_from_template(improved_resume)
 
             with open(docx_file, "rb") as file:
                 st.download_button(
