@@ -1,8 +1,8 @@
 import os
 import json
+import re
 from openai import OpenAI
 from dotenv import load_dotenv
-from doc_gen import Document
 
 load_dotenv()
 
@@ -15,17 +15,21 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
+def safe_json_parse(raw):
+    raw = raw.strip()
 
-def load_docx_template(template_name="Sample_Template.docx"):
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    template_path = os.path.join(current_dir, "templates", template_name)
+    # Remove markdown fences
+    raw = re.sub(r"^```(?:json)?", "", raw)
+    raw = re.sub(r"```$", "", raw)
 
-    if not os.path.exists(template_path):
-        raise FileNotFoundError(f"Template not found at {template_path}")
+    # Extract first JSON object from text
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise ValueError("Model did not return JSON:\n" + raw)
 
-    doc = Document(template_path)
-    full_text = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-    return "\n".join(full_text)
+    json_text = match.group(0)
+    return json.loads(json_text)
+
 
 
 def clean_json(data):
@@ -42,7 +46,7 @@ def clean_json(data):
     return data
 
 
-def enhance_resume(resume_json, job_description_json, Sample_Template, feedback=None):
+def enhance_resume(resume_json, job_description_json, feedback=None):
 
     cleaned_resume = clean_json(resume_json)
     cleaned_jd = clean_json(job_description_json)
@@ -58,54 +62,57 @@ Generate a recruiter ready, ATS optimized, high impact technical resume
 tailored specifically to the provided Job Description.
 
 STRICT OUTPUT RULES:
-- Output a JSON object only
+- Return ONLY valid JSON. No surrounding text.
 - Do NOT output LaTeX
 - Do NOT output markdown
 - Do NOT include explanations
 - Do NOT include decorative symbols
-- Do NOT use hyphenated words
-- Do NOT invent or assume missing data unless explicitly allowed
-- Deterministic output required
+- No trailing commas
+- No comments
+- No extra keys
+- Must be parseable by json.loads()
 
-REFERENCE FORMAT:
-Use sample_template.docx strictly as formatting reference.
-Maintain professional recruiter friendly layout.
 
 STRUCTURE REQUIREMENTS:
-You MUST strictly follow this exact section order and formatting:
+You MUST strictly follow this exact key structure:
 
-1. Header
-                                                  NAME
-                                PHONE | EMAIL | LINKEDIN_URL | GITHUB_URL
-_________________________________________________________________________________________________________
-
-1. {{Profession Ats freindly Job Description Based Summary}}
-
-_________________________________________________________________________________________________________
-
-2. Education
-   DEGREE                                                                 DURATION(yy/mm/dd - yy/mm/dd)
-   INSTITUTION                                                                         GRADE
-_________________________________________________________________________________________________________
-
-3. Experience
-   ROLE — COMPANY                                                         DURATION(yy/mm/dd - yy/mm/dd)
-   • Bullet
-   • Bullet
-   • Bullet
-_________________________________________________________________________________________________________ 
-
-4. Projects
-   PROJECT TITLE
-   • Bullet
-   • Bullet
-_________________________________________________________________________________________________________
-5. Relevant Coursework
-   Bullet list in two rows separated by spaces
-_________________________________________________________________________________________________________
-
-6. Technical Skills
-   CATEGORY: skills comma separated
+Structure:
+{{
+  "header": {{
+    "name": "",
+    "phone": "",
+    "email": "",
+    "linkedin": "",
+    "github": ""
+  }},
+  "summary": "",
+  "education": [
+    {{
+      "degree": "",
+      "institution": "",
+      "grade": "",
+      "duration": ""
+    }}
+  ],
+  "experience": [
+    {{
+      "role": "",
+      "company": "",
+      "duration": "",
+      "bullets": []
+    }}
+  ],
+  "projects": [
+    {{
+      "title": "",
+      "bullets": []
+    }}
+  ],
+  "coursework": [],
+  "skills": {{
+    "Category": []
+  }}
+}}
 
 
 BULLET RULES (CRITICAL):
@@ -126,20 +133,19 @@ ATS OPTIMIZATION RULES:
 - Avoid fluff
 
 SMART CONTENT LOGIC:
-- Omit empty sections completely
 - If fewer than 2 projects exist → generate relevant project aligned to Job Description
 - Generated project MUST be realistic, technical, and JD relevant
 - Do NOT fabricate employment experience
 - Do NOT invent certifications or degrees
 
 Experience Generation Rules:
-- should align with job description have 2 bullet point least
-- Maximum 3 bullets in accordance to job description if not exp not given
+- Should align with job description have 2 sentences. least
+- Maximum 3 sentences. in accordance to job description if not exp not given
 - Do not add experience if not given
 
 PROJECT GENERATION RULES:
 - Only trigger if resume lacks sufficient projects
-- There should be atleast 3 projects according to the Job Description.
+- There should be atleast 3 projects according to the Job Description if enough projects not given.
 - Must appear authentic and technically credible
 - Must align with candidate skill profile
 - Must follow bullet rules strictly
@@ -149,7 +155,7 @@ Summary Rules:
 - Should be humanized
 - ATS freindly
 - No irrelevnant info
-- Atleast 3 lines and max 5 lines
+- Atleast 3 – 5 sentences.
 
 Skills and Courswork GENERATION RULES:
 - Should have 5 bullet skills
@@ -157,13 +163,10 @@ Skills and Courswork GENERATION RULES:
 - relevant to project and job description
 
 FORMATTING RULES:
-- Same as sample_template 
-- Date and Grade should be at right most of the row
 - Clean spacing between sections
 - Strict alignment
-- No placeholders
+- Do not return empty fields; omit keys if data unavailable.
 - No commentary
-- Insert separator line after each section
 
 If feedback is provided, revise the resume strictly according to feedback while maintaining ATS optimization.
 Do not ignore feedback.
@@ -175,14 +178,12 @@ RESUME DATA (JSON):
 JOB DESCRIPTION (JSON):
 {jd_string}
 
-REFERENCE TEMPLATE:
-{Sample_Template}
 
 FEEDBACK FROM USER (if any):
 {feedback if feedback else "No additional feedback provided."}
 ==============================
 
-Return ONLY the final resume content.
+Return ONLY the ATS freindly json file.
 """
 
     response = client.chat.completions.create(
@@ -200,4 +201,10 @@ Return ONLY the final resume content.
         temperature=0
     )
 
-    return response.choices[0].message.content
+    raw = response.choices[0].message.content
+
+    print("RAW MODEL OUTPUT:\n", raw)   # temporary debug
+
+    return safe_json_parse(raw)
+
+
