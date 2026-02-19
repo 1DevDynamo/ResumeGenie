@@ -1,9 +1,12 @@
 import os
+import re
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from datetime import datetime
+
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,10 +50,34 @@ def add_left_right_line(doc, left_text, right_text, bold_left=False):
     set_font(right_run, 11, False)
 
 
+
 def add_bullet(doc, text):
     p = doc.add_paragraph(style="List Bullet")
-    run = p.add_run(text)
-    set_font(run)
+
+    pattern = r"\*\*(.*?)\*\*"
+    last_end = 0
+
+    for match in re.finditer(pattern, text):
+        start, end = match.span()
+
+        # Add normal text before bold
+        if start > last_end:
+            normal_text = text[last_end:start]
+            run = p.add_run(normal_text)
+            set_font(run)
+
+        # Add bold text (without **)
+        bold_text = match.group(1)
+        run = p.add_run(bold_text)
+        set_font(run, bold=True)
+
+        last_end = end
+
+    # Add remaining normal text
+    if last_end < len(text):
+        remaining_text = text[last_end:]
+        run = p.add_run(remaining_text)
+        set_font(run)
 
 def add_horizontal_line(doc):
     p = doc.add_paragraph()
@@ -102,11 +129,14 @@ def generate_docx_from_template(resume):
 
 
     # ================= SUMMARY =================
-    summary = resume.get("summary", "")
-    if resume.get("Summary"):
+    summary = resume.get("summary", "").strip()
+    if summary:
         add_section_title(doc, "Summary")
-        p = doc.add_paragraph(resume["summary"])
-        p.paragraph_format.space_after = Pt(6)
+        p = doc.add_paragraph()
+        run = p.add_run(summary)
+        set_font(run, 11, bold=False)
+        p.paragraph_format.space_before = Pt(4)
+        p.paragraph_format.space_after = Pt(8)
 
     # ================= EDUCATION =================
     education = resume.get("education", [])
@@ -175,7 +205,9 @@ def generate_docx_from_template(resume):
             run = p.add_run(line)
             set_font(run)
 
-    output = os.path.join(BASE_DIR, "Generated_Resume.docx")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output = os.path.join(BASE_DIR, f"Generated_Resume_{timestamp}.docx")
+
     doc.save(output)
 
     return output

@@ -162,6 +162,13 @@ Skills and Courswork GENERATION RULES:
 - should have 5 bullet coursworks
 - relevant to project and job description
 
+HIGHLIGHTING RULE:
+- Bold the most important technical keywords and JD-aligned skills inside bullets only in Experience and Projects.
+- Use markdown bold format: **keyword**
+- Do NOT bold entire sentence.
+- Bold only critical skills, technologies, tools, or impact words.
+- Maximum 3 bold words per bullet.
+
 FORMATTING RULES:
 - Clean spacing between sections
 - Strict alignment

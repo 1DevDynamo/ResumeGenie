@@ -54,3 +54,11 @@ def build_live_payload():
     }
 
     return payload
+
+
+
+
+# --- LIVE SIDEBAR JSON PREVIEW ---
+# st.sidebar.subheader("📦 Live JSON Payload")
+# live_payload = build_live_payload()
+# st.sidebar.json(live_payload)

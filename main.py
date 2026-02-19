@@ -2,9 +2,78 @@ import streamlit as st
 from datetime import datetime
 import json
 import os
-from json_preview import build_live_payload
 from llm import enhance_resume
 from doc_gen import generate_docx_from_template
+
+
+def render_resume_preview(resume):
+
+    header = resume.get("header", {})
+
+    full_name = header.get("name", "")
+    contact_line = " | ".join(
+        filter(None, [
+            header.get("phone", ""),
+            header.get("email", ""),
+            header.get("linkedin", ""),
+            header.get("github", "")
+        ])
+    )
+
+    # HEADER
+    st.markdown(f"## {full_name}")
+    st.markdown(contact_line)
+    st.divider()
+
+    # SUMMARY
+    if resume.get("summary"):
+        st.markdown("### Summary")
+        st.write(resume["summary"])
+        st.divider()
+
+    # EDUCATION
+    if resume.get("education"):
+        st.markdown("### Education")
+        for edu in resume["education"]:
+            st.markdown(
+                f"**{edu.get('degree','')}**  |  {edu.get('duration','')}"
+            )
+            st.write(
+                f"{edu.get('institution','')}  |  {edu.get('grade','')}"
+            )
+        st.divider()
+
+    # EXPERIENCE
+    if resume.get("experience"):
+        st.markdown("### Experience")
+        for exp in resume["experience"]:
+            st.markdown(
+                f"**{exp.get('role','')} — {exp.get('company','')}**  |  {exp.get('duration','')}"
+            )
+            for bullet in exp.get("bullets", []):
+                st.markdown(f"- {bullet}")
+        st.divider()
+
+    # PROJECTS
+    if resume.get("projects"):
+        st.markdown("### Projects")
+        for proj in resume["projects"]:
+            st.markdown(f"**{proj.get('title','')}**")
+            for bullet in proj.get("bullets", []):
+                st.markdown(f"- {bullet}")
+        st.divider()
+
+    # COURSEWORK
+    if resume.get("coursework"):
+        st.markdown("### Relevant Coursework")
+        st.write(" • ".join(resume["coursework"]))
+        st.divider()
+
+    # SKILLS
+    if resume.get("skills"):
+        st.markdown("### Technical Skills")
+        for category, items in resume["skills"].items():
+            st.write(f"**{category}:** {', '.join(items)}")
 
 
 # --- DIRECTORY SETUP ---
@@ -96,10 +165,6 @@ st.divider()
 
 #Side Bar
 st.sidebar.title("About")
-# --- LIVE SIDEBAR JSON PREVIEW ---
-st.sidebar.subheader("📦 Live JSON Payload")
-live_payload = build_live_payload()
-st.sidebar.json(live_payload)
 
 
 # --- HISTORY ---
@@ -397,7 +462,6 @@ with st.container(border=True):
                 "coursework": st.session_state.resume["coursework"]
                 }
             st.session_state.last_payload = final_payload
-
             
             # ✅ NEW: Separate JD payload
             jd_payload = {
@@ -417,7 +481,12 @@ with st.container(border=True):
 
 
             st.success("✅ Resume Generated Successfully!")
-            st.json(generated_resume)
+            with st.expander("👁️ Resume Preview", expanded=True):
+                with st.container(height=500, border=True):
+                    render_resume_preview(generated_resume)
+
+
+            # st.json(generated_resume)        for ai generated json preview
 
             
             # ✅ Generate DOCX file
@@ -425,11 +494,16 @@ with st.container(border=True):
 
             
             # ✅ Provide DOCX download
+            full_name = generated_resume.get("header", {}).get("name", "User")
+            safe_name = full_name.strip().replace(" ", "_")
+
+            download_filename = f"{safe_name}_Resume.docx"
+
             with open(docx_file, "rb") as f:
                 st.download_button(
                     label="⬇️ Download Resume.docx",
                     data=f,
-                    file_name="Generated_Resume.docx",
+                    file_name=download_filename,
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                     )
@@ -469,16 +543,25 @@ if st.session_state.has_generated and "last_payload" in st.session_state:
 
             st.success("✅ Resume Improved Successfully!")
 
-            st.text_area("Updated Resume", improved_resume, height=600)
+            with st.expander("👁️ Updated Resume Preview", expanded=True):
+                with st.container(height=500, border=True):
+                    render_resume_preview(improved_resume)
+
+
+
 
             # 👇 NEW DOWNLOAD
             docx_file = generate_docx_from_template(improved_resume)
+
+            full_name = improved_resume.get("header", {}).get("name", "User")
+            safe_name = full_name.strip().replace(" ", "_")
+            download_filename = f"{safe_name}_Resume.docx"
 
             with open(docx_file, "rb") as file:
                 st.download_button(
                     label="📥 Download Improved Resume (.docx)",
                     data=file,
-                    file_name="Improved_Resume.docx",
+                    file_name=download_filename,
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                 )
