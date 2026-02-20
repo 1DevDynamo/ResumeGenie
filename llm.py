@@ -163,7 +163,9 @@ Skills and Courswork GENERATION RULES:
 - relevant to project and job description
 
 HIGHLIGHTING RULE:
-- Bold the most important technical keywords and JD-aligned skills inside bullets only in Experience and Projects.
+- Bold the most important technical keywords and JD-aligned skills inside bullets.
+- Bold not only relevant word like Python Ml bold revent information like "15% accuracy".
+- Bold numbers along with its meaning like "15% accuracy"
 - Use markdown bold format: **keyword**
 - Do NOT bold entire sentence.
 - Bold only critical skills, technologies, tools, or impact words.

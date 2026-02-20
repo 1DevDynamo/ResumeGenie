@@ -1,0 +1,38 @@
+{
+    "contacts": {
+        "f_name": "Vishwas",
+        "m_name": "",
+        "l_name": "Hello",
+        "email": "harsh@gmail.com",
+        "phone": "+91 982547058",
+        "linked_in": "linkedin.com",
+        "github": "github.com"
+    },
+    "education": [
+        {
+            "degree": "Bachelor's",
+            "institute": "medicaps",
+            "start": "Feb 2026",
+            "end": "Feb 2026"
+        }
+    ],
+    "experience": [
+        {
+            "company": "Avery Bit",
+            "role": "Intern",
+            "start": "Feb 2026",
+            "end": "Feb 2026",
+            "desc": ""
+        }
+    ],
+    "projects": [
+        {
+            "name": "HumanDigit Classification MINIST",
+            "url": "",
+            "mem": "3",
+            "desc": ""
+        }
+    ],
+    "skills": [],
+    "coursework": []
+}

@@ -79,6 +79,39 @@ def add_bullet(doc, text):
         run = p.add_run(remaining_text)
         set_font(run)
 
+
+def add_formatted_paragraph(doc, text):
+    p = doc.add_paragraph()
+
+    pattern = r"\*\*(.*?)\*\*"
+    last_end = 0
+
+    for match in re.finditer(pattern, text):
+        start, end = match.span()
+
+        # Normal text before bold
+        if start > last_end:
+            normal_text = text[last_end:start]
+            run = p.add_run(normal_text)
+            set_font(run)
+
+        # Bold text (without **)
+        bold_text = match.group(1)
+        run = p.add_run(bold_text)
+        set_font(run, bold=True)
+
+        last_end = end
+
+    # Remaining text
+    if last_end < len(text):
+        remaining_text = text[last_end:]
+        run = p.add_run(remaining_text)
+        set_font(run)
+
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after = Pt(8)
+
+
 def add_horizontal_line(doc):
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(2)
@@ -132,11 +165,8 @@ def generate_docx_from_template(resume):
     summary = resume.get("summary", "").strip()
     if summary:
         add_section_title(doc, "Summary")
-        p = doc.add_paragraph()
-        run = p.add_run(summary)
-        set_font(run, 11, bold=False)
-        p.paragraph_format.space_before = Pt(4)
-        p.paragraph_format.space_after = Pt(8)
+        add_formatted_paragraph(doc, summary)
+
 
     # ================= EDUCATION =================
     education = resume.get("education", [])

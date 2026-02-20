@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 import json
 import os
+from datetime import date
 from llm import enhance_resume
 from doc_gen import generate_docx_from_template
 
@@ -76,6 +77,12 @@ def render_resume_preview(resume):
             st.write(f"**{category}:** {', '.join(items)}")
 
 
+def format_date(value):
+    if isinstance(value, date):
+        return value.strftime("%b %Y")  # Jan 2024
+    return value
+
+
 # --- DIRECTORY SETUP ---
 DB_DIR = "dB"
 if not os.path.exists(DB_DIR):
@@ -108,7 +115,7 @@ def get_missing_fields(contacts, edu_list, exp_list, proj_list):
     def is_empty(val):
         return val is None or str(val).strip() == ""
 
-    # --- CONTACT ---
+    # ================= CONTACT =================
     if is_empty(contacts.get('f_name')):
         missing.append("First Name")
     if is_empty(contacts.get('l_name')):
@@ -118,30 +125,45 @@ def get_missing_fields(contacts, edu_list, exp_list, proj_list):
     if is_empty(contacts.get('phone')):
         missing.append("Phone")
 
-    # --- EDUCATION ---
+    # ================= EDUCATION =================
+    if len(edu_list) == 0:
+        missing.append("At least 1 Education entry required")
+
     for i, edu in enumerate(edu_list):
-        # Only validate if user started typing institute
-        if is_empty(edu.get('institute')):
-            continue
 
-        # If institute exists, it's valid (required field satisfied)
-        # No further action needed
+        if not edu.get('degree'):
+            missing.append(f"Education #{i+1} Degree")
 
-    # --- EXPERIENCE ---
+        if not edu.get('institute'):
+            missing.append(f"Education #{i+1} Institution")
+
+        if not edu.get('start'):
+            missing.append(f"Education #{i+1} Start Date")
+
+        if not edu.get('end'):
+            missing.append(f"Education #{i+1} End Date")
+
+    # ================= EXPERIENCE =================
     for i, exp in enumerate(exp_list):
-        if is_empty(exp.get('company')) and any([
-            not is_empty(exp.get('role')),
-            not is_empty(exp.get('desc'))
-        ]):
+
+        if not exp.get('company'):
             missing.append(f"Experience #{i+1} Company")
 
-    # --- PROJECTS ---
+        if not exp.get('role'):
+            missing.append(f"Experience #{i+1} Role")
+
+        if not exp.get('start'):
+            missing.append(f"Experience #{i+1} Start Date")
+
+        if not exp.get('end'):
+            missing.append(f"Experience #{i+1} End Date or Present")
+
+    # ================= PROJECTS =================
+    if len(proj_list) == 0:
+        missing.append("At least 1 Project required")
+
     for i, proj in enumerate(proj_list):
-        if is_empty(proj.get('name')) and any([
-            not is_empty(proj.get('url')),
-            not is_empty(proj.get('mem')),
-            not is_empty(proj.get('desc'))
-        ]):
+        if is_empty(proj.get('name')):
             missing.append(f"Project #{i+1} Name")
 
     return missing
@@ -225,19 +247,26 @@ if save_trigger:
         education.append({
             "degree": st.session_state.get(f"deg_{i}", ""),
             "institute": st.session_state.get(f"inst_{i}", ""),
-            "start": str(st.session_state.get(f"s_ed_{i}", "")),
-            "end": str(st.session_state.get(f"e_ed_{i}", ""))
+            "start": format_date(st.session_state.get(f"s_ed_{i}")),
+            "end": format_date(st.session_state.get(f"e_ed_{i}"))
         })
 
     experience = []
     for i in range(len(st.session_state.resume["experience"])):
+        is_present = st.session_state.get(f"present_{i}", False)
+
+        end_value = "Present" if is_present else format_date(
+            st.session_state.get(f"e_ex_{i}")
+        )
+
         experience.append({
             "company": st.session_state.get(f"comp_{i}", ""),
             "role": st.session_state.get(f"role_{i}", ""),
-            "start": str(st.session_state.get(f"s_ex_{i}", "")),
-            "end": str(st.session_state.get(f"e_ex_{i}", "")),
+            "start": format_date(st.session_state.get(f"s_ex_{i}")),
+            "end": end_value,
             "desc": st.session_state.get(f"desc_{i}", "")
         })
+
 
     projects = []
     for i in range(len(st.session_state.resume["projects"])):
@@ -257,6 +286,13 @@ if save_trigger:
         "coursework": st.session_state.resume["coursework"]
     }
 
+    missing = get_missing_fields(contacts, education, experience, projects)
+
+    if missing:
+        st.error(f"🚫 Missing: {', '.join(missing)}")
+        st.stop()
+
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{contacts.get('f_name','User')}_{timestamp}.json"
     filepath = os.path.join(DB_DIR, filename)
@@ -268,11 +304,18 @@ if save_trigger:
 
 # --- RESET LOGIC ---
 if reset_trigger:
-    # Clear all session state
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
 
-    # Reinitialize resume structure
+    # Clear contact fields
+    for key in [
+        "f_name", "m_name", "l_name",
+        "email", "phone",
+        "linked_in", "github",
+        "jd_title", "jd_desc", "jd_skills",
+        "resume_feedback"
+    ]:
+        st.session_state[key] = ""
+
+    # Reset resume dynamic sections
     st.session_state.resume = {
         "education": [],
         "experience": [],
@@ -281,8 +324,14 @@ if reset_trigger:
         "coursework": []
     }
 
+    # Clear generated data
+    st.session_state.generated_resume = None
+    st.session_state.has_generated = False
+    st.session_state.last_payload = None
+
     st.success("✨ Form Reset Successfully!")
     st.rerun()
+
 
 
 
@@ -318,8 +367,18 @@ with st.container(border=True):
             e_col1.selectbox("📜 Degree", ["Bachelor's", "Master's", "PhD"], key=f"deg_{i}")
             e_col2.text_input("🏫 Institute *", key=f"inst_{i}")
             d_col1, d_col2 = st.columns(2)
-            d_col1.date_input("📅 Start Date", key=f"s_ed_{i}")
-            d_col2.date_input("🏁 End Date", key=f"e_ed_{i}")
+            start_date = d_col1.date_input(
+                "📅 Start Date",
+                value=None,
+                key=f"s_ed_{i}"
+            )
+
+            end_date = d_col2.date_input(
+                "🏁 End Date",
+                value=None,
+                key=f"e_ed_{i}"
+            )
+
 
             if st.button(f"🗑️ Remove Item {i+1}", key=f"rem_ed_{i}"):
                 st.session_state.resume["education"].pop(i)
@@ -340,13 +399,31 @@ with st.container(border=True):
             c_col1.text_input("🏢 Company *", key=f"comp_{i}")
             c_col2.text_input("🛠️ Role", key=f"role_{i}")
             d_col1, d_col2 = st.columns(2)
-            d_col1.date_input("📅 Start Date", key=f"s_ex_{i}")
-            d_col2.date_input("🏁 End Date", key=f"e_ex_{i}")
-            st.text_area("📝 Description", key=f"desc_{i}")
+            d_col1.date_input(
+                "📅 Start Date",
+                value=None,
+                key=f"s_ex_{i}"
+            )
 
-            if st.button(f"🗑️ Remove Job {i+1}", key=f"rem_exp_{i}"):
-                st.session_state.resume["experience"].pop(i)
-                st.rerun()
+            currently_working = st.checkbox(
+                "Currently Working Here",
+                key=f"present_{i}"
+            )
+
+            if currently_working:
+                st.text_input(
+                    "🏁 End Date",
+                    value="Present",
+                    disabled=True,
+                    key=f"e_ex_{i}"
+                )
+            else:
+                st.date_input(
+                    "🏁 End Date",
+                    value=None,
+                    key=f"e_ex_{i}"
+                )
+
 
 # --- PROJECTS ---
 st.write("##")
@@ -422,19 +499,26 @@ with st.container(border=True):
             education.append({
                 "degree": st.session_state.get(f"deg_{i}", ""),
                 "institute": st.session_state.get(f"inst_{i}", ""),
-                "start": str(st.session_state.get(f"s_ed_{i}", "")),
-                "end": str(st.session_state.get(f"e_ed_{i}", ""))
+                "start": format_date(st.session_state.get(f"s_ed_{i}")),
+                "end": format_date(st.session_state.get(f"e_ed_{i}"))
             })
 
         experience = []
         for i in range(len(st.session_state.resume["experience"])):
+            is_present = st.session_state.get(f"present_{i}", False)
+
+            end_value = "Present" if is_present else format_date(
+                st.session_state.get(f"e_ex_{i}")
+            )
+
             experience.append({
                 "company": st.session_state.get(f"comp_{i}", ""),
                 "role": st.session_state.get(f"role_{i}", ""),
-                "start": str(st.session_state.get(f"s_ex_{i}", "")),
-                "end": str(st.session_state.get(f"e_ex_{i}", "")),
+                "start": format_date(st.session_state.get(f"s_ex_{i}")),
+                "end": end_value,
                 "desc": st.session_state.get(f"desc_{i}", "")
             })
+
 
         projects = []
         for i in range(len(st.session_state.resume["projects"])):
