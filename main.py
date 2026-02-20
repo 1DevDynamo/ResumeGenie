@@ -155,7 +155,7 @@ def get_missing_fields(contacts, edu_list, exp_list, proj_list):
         if not exp.get('start'):
             missing.append(f"Experience #{i+1} Start Date")
 
-        if not exp.get('end'):
+        if not exp.get('end'):  
             missing.append(f"Experience #{i+1} End Date or Present")
 
     # ================= PROJECTS =================
@@ -395,18 +395,21 @@ with st.container(border=True):
 
     for i in range(len(st.session_state.resume["experience"])):
         with st.container(border=True):
+
             c_col1, c_col2 = st.columns(2)
             c_col1.text_input("🏢 Company *", key=f"comp_{i}")
             c_col2.text_input("🛠️ Role", key=f"role_{i}")
+
             d_col1, d_col2 = st.columns(2)
+
             d_col1.date_input(
                 "📅 Start Date",
                 value=None,
                 key=f"s_ex_{i}"
             )
 
-            currently_working = st.checkbox(
-                "Currently Working Here",
+            currently_working = d_col2.checkbox(
+                "Currently Working Here",   
                 key=f"present_{i}"
             )
 
@@ -423,6 +426,14 @@ with st.container(border=True):
                     value=None,
                     key=f"e_ex_{i}"
                 )
+
+        # 🔥 ADD THIS LINE
+        st.text_area("📝 Description", key=f"desc_{i}")
+
+        if st.button(f"🗑️ Remove Job {i+1}", key=f"rem_exp_{i}"):
+            st.session_state.resume["experience"].pop(i)
+            st.rerun()
+
 
 
 # --- PROJECTS ---
